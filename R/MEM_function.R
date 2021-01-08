@@ -31,10 +31,10 @@ MEM <- function(exp_data, transform=FALSE, cofactor=1, choose.markers=FALSE,mark
 
         exp_data = format.data(exp_data,file.is.clust,add.fileID)
 
-    }else{
-        if(is(exp_data)[1] == "matrix" || is(exp_data)[1] == "data.frame"){
-            exp_data = as.data.frame(exp_data)
-        }
+    } else if(is(exp_data)[1] == "matrix" || is(exp_data)[1] == "data.frame") {
+        exp_data = as.data.frame(exp_data)
+ 
+    } else { 
         if("fcs" %in% file_ext(exp_data)){
             exp_data = exprs(read.FCS(exp_data))
         }
@@ -106,8 +106,11 @@ MEM <- function(exp_data, transform=FALSE, cofactor=1, choose.markers=FALSE,mark
     # Get population medians and IQRs
     for(i in 1:num_pops){
         pop = pop_names[i]
-        MAGpop[i,] = abs(apply(subset(exp_data,cluster==pop),2,FUN=median,na.rm=TRUE))
-        IQRpop[i,] = apply(subset(exp_data,cluster==pop),2,FUN=IQR,na.rm=TRUE)
+        # MAGpop[i,] = abs(apply(subset(exp_data,cluster==pop),2,FUN=median,na.rm=TRUE))
+        # IQRpop[i,] = apply(subset(exp_data,cluster==pop),2,FUN=IQR,na.rm=TRUE)
+        idx = which(exp_data[,"cluster"] == pop)
+        MAGpop[i,] = abs(matrixStats::colMedians(as.matrix(exp_data), rows = idx, na.rm = TRUE))
+        IQRpop[i,] = matrixStats::colIQRs(as.matrix(exp_data), rows = idx, na.rm = TRUE)
     }
 
     # Get reference population medians and IQRs
@@ -119,11 +122,15 @@ MEM <- function(exp_data, transform=FALSE, cofactor=1, choose.markers=FALSE,mark
     }else if(zero.ref==TRUE){
         zeroRef_vals = zero.ref(exp_data,num_pops,num_markers)
         MAGref = zeroRef_vals[[1]]
-        IQRref = zeroRef_vals[[2]]}else{
+        IQRref = zeroRef_vals[[2]]
+    }else{
         for(i in 1:num_pops){
             pop = pop_names[i]
-            MAGref[i,] = abs(apply(subset(exp_data,cluster!=pop),2,FUN=median,na.rm=TRUE))
-            IQRref[i,] = apply(subset(exp_data,cluster!=pop),2,FUN=IQR,na.rm=TRUE)
+            # MAGref[i,] = abs(apply(subset(exp_data,cluster!=pop),2,FUN=median,na.rm=TRUE))
+            # IQRref[i,] = apply(subset(exp_data,cluster!=pop),2,FUN=IQR,na.rm=TRUE)
+            idx = which(exp_data[,"cluster"] != pop)
+            MAGref[i,] = abs(matrixStats::colMedians(as.matrix(exp_data), rows = idx, na.rm = TRUE))
+            IQRref[i,] = matrixStats::colIQRs(as.matrix(exp_data), rows = idx, na.rm = TRUE)
         }
     }
 
@@ -144,7 +151,6 @@ MEM <- function(exp_data, transform=FALSE, cofactor=1, choose.markers=FALSE,mark
         IQRpop[,i] = pmax(IQRpop[,i],IQR.thresh)
         IQRref[,i] = pmax(IQRref[,i],IQR.thresh)
     }
-
 
     IQRcomp = (IQRref/IQRpop)-1
     # If IQRpop > IQRref, set IQRcomp to 0 (IQRcomp will only be less than 0 if IQRpop > IQRref)
